@@ -51,7 +51,7 @@ jobs:
 
       - name: Run tests
         run: |
-          export DATABASE_URL=sqlite:///:memory:
+          export DOCKER_DATABASE_URL=sqlite:///:memory:
           export PYTHONPATH=.
           pytest -v --disable-warnings
 
