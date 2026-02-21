@@ -8,7 +8,8 @@ from server.app.connect import db_session, engine
 
 app = FastAPI()
 
-Base.metadata.create_all(bind=engine)
+if os.getenv("RUN_MIGRATIONS", "true") == "true":
+    Base.metadata.create_all(bind=engine)
 
 
 def get_db():
@@ -104,3 +105,8 @@ def delete_book(request: Request, book_id: int, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         "delete_book.html", {"request": request, "book": book}
     )
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
