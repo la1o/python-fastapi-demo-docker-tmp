@@ -9,13 +9,11 @@ on:
 env:
   PYTHON_VERSION: "3.14.3"
   IMAGE_NAME: bookshelf-api
-  RUNNER: self-hosted
-  #RUNNER: ubuntu-latest
 
 jobs:
   validate-branch:
     if: github.event_name == 'pull_request'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Validate branch naming
         run: |
@@ -27,7 +25,7 @@ jobs:
           fi
 
   test-and-build:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [validate-branch]
     if: always() && (github.event_name == 'push' || needs.validate-branch.result == 'success')
 
@@ -62,7 +60,7 @@ jobs:
   publish:
     if: github.ref == 'refs/heads/main'
     needs: test-and-build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
