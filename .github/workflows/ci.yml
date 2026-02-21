@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  PYTHON_VERSION: "3.14"
+  PYTHON_VERSION: "3.14.3"
   IMAGE_NAME: bookshelf-api
   RUNNER: self-hosted
   #RUNNER: ubuntu-latest

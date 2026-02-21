@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.14-slim-bookworm as builder
+FROM python:3.14.3-slim-bookworm as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -12,7 +12,7 @@ WORKDIR /server
 COPY ./server/requirements.txt /server/
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /server/wheels -r requirements.txt
 
-FROM python:3.14-slim-bookworm as runner
+FROM python:3.14.3-slim-bookworm as runner
 
 WORKDIR /server
 
