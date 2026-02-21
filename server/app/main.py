@@ -8,7 +8,9 @@ from server.app.connect import db_session, engine
 
 app = FastAPI()
 
-Base.metadata.create_all(bind=engine)
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
 
 def get_db():
     db = db_session()

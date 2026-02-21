@@ -23,7 +23,7 @@ class Event(BaseModel):
     author: str
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "message": "Success",
                 "status": "200 OK",
