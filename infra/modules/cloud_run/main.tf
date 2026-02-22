@@ -4,6 +4,7 @@ variable "service_name" {}
 variable "image" {}
 variable "runtime_sa_email" {}
 variable "secret_name" {}
+variable "docker_database_url" {}
 
 resource "google_cloud_run_v2_service" "service" {
   name     = var.service_name
@@ -17,6 +18,39 @@ resource "google_cloud_run_v2_service" "service" {
 
     containers {
       image = var.image
+
+      ports {
+        container_port = 8000
+      }
+
+      startup_probe {
+        initial_delay_seconds = 10
+        timeout_seconds = 5
+        period_seconds = 240
+        failure_threshold = 5
+        tcp_socket {
+          port = 8000
+        }
+      }
+
+      liveness_probe {
+        http_get {
+          path = "/health"
+        }
+      }
+
+      resources {
+        cpu_idle = true
+        limits = {
+          cpu    = "1"
+          memory = "128Mi"
+        }
+      }
+
+      env {
+        name  = "DOCKER_DATABASE_URL"
+        value = var.docker_database_url
+      }
 
       env {
         name = "APP_VERSION"

@@ -13,7 +13,7 @@ resource "google_artifact_registry_repository" "repo" {
 resource "google_artifact_registry_repository_iam_member" "writer" {
   project    = var.project_id
   location   = var.region
-  repository = google_artifact_registry_repository.repo.name
+  repository = var.repository_name
 
   role   = "roles/artifactregistry.writer"
   member = "serviceAccount:${var.deployer_sa_email}"

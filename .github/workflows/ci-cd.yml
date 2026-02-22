@@ -33,6 +33,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
+          cache: 'pip'
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install deps
@@ -136,5 +137,7 @@ jobs:
             --region ${REGION} \
             --service-account ${SERVICE_NAME}-runtime@${PROJECT_ID}.iam.gserviceaccount.com \
             --platform managed \
+            --deploy-health-check \
+            --timeout=1m1s \
             --quiet
 
