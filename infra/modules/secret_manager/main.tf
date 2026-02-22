@@ -6,11 +6,15 @@ variable "deployer_sa_email" {}
 resource "google_secret_manager_secret" "secret" {
   project   = var.project_id
   secret_id = var.secret_name
-  secret_data = "init"
 
   replication {
     auto {}
   }
+}
+
+resource "google_secret_manager_secret_version" "version" {
+  secret      = google_secret_manager_secret.secret.id
+  secret_data = "init"
 }
 
 # Runtime solo puede LEER
