@@ -108,5 +108,7 @@ def delete_book(request: Request, book_id: int, db: Session = Depends(get_db)):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
-
+    return {
+        "status": "ok",
+        "version": os.getenv("APP_VERSION", "unknown")
+    }

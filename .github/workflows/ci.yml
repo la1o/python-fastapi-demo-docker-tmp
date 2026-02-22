@@ -1,40 +1,33 @@
-name: CI
+name: CI-CD
 
 on:
-  pull_request:
-    branches: [ main ]
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   PYTHON_VERSION: "3.14.3"
-  IMAGE_NAME: bookshelf-api
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-north2
+  REPOSITORY: app-api-dev
+  SERVICE_NAME: app-api-dev
+  IMAGE_NAME: app
+  SECRET_NAME: app-api-dev-version
 
 jobs:
-  validate-branch:
-    if: github.event_name == 'pull_request'
+  build-test-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Validate branch naming
-        run: |
-          BRANCH="${{ github.head_ref }}"
-          echo "Branch: $BRANCH"
-          if [[ ! "$BRANCH" =~ ^feature\/.+ ]]; then
-            echo "Branch name must start with feature/"
-            exit 1
-          fi
-
-  test-and-build:
-    runs-on: ubuntu-latest
-    needs: [validate-branch]
-    if: always() && (github.event_name == 'push' || needs.validate-branch.result == 'success')
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      # -----------------------
+      # Setup Python
+      # -----------------------
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -42,11 +35,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r server/requirements.txt
-          pip install pytest flake8 httpx
-
-      - name: Lint
-        run: flake8 server --max-line-length=100
-        continue-on-error: true
+          pip install pytest
 
       - name: Run tests
         run: |
@@ -54,23 +43,75 @@ jobs:
           export PYTHONPATH=.
           pytest -v --disable-warnings
 
-      - name: Build Docker image
+      # -----------------------
+      # Auth GCP
+      # -----------------------
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+      # -----------------------
+      # Build & Push
+      # -----------------------
+      - name: Build & Push Image
         run: |
-          docker build -t $IMAGE_NAME:${{ github.sha }} .
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${{ github.sha }}"
+          docker build -t $IMAGE .
+          docker push $IMAGE
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-  publish:
-    if: github.ref == 'refs/heads/main'
-    needs: test-and-build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build image
+      # -----------------------
+      # Save current deployed version (for rollback)
+      # -----------------------
+      - name: Get current deployed version
+        id: current_version
         run: |
-          docker build -t $IMAGE_NAME:${{ github.sha }} .
+          PREVIOUS=$(gcloud secrets versions access latest \
+            --secret=${SECRET_NAME} \
+            --project=${PROJECT_ID} 2>/dev/null || echo "")
+          echo "PREVIOUS=$PREVIOUS" >> $GITHUB_ENV
 
-      - name: Tag as latest
+      # -----------------------
+      # Update secret with new SHA
+      # -----------------------
+      - name: Update Secret with new version
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
+          echo "${{ github.sha }}" | \
+          gcloud secrets versions add ${SECRET_NAME} \
+            --data-file=- \
+            --project=${PROJECT_ID}
+
+      # -----------------------
+      # Deploy
+      # -----------------------
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          gcloud run deploy ${SERVICE_NAME} \
+            --image ${IMAGE} \
+            --region ${REGION} \
+            --service-account ${SERVICE_NAME}-runtime@${PROJECT_ID}.iam.gserviceaccount.com \
+            --platform managed \
+            --quiet
+
+      # -----------------------
+      # Rollback if deploy fails
+      # -----------------------
+      - name: Rollback
+        if: failure() && env.PREVIOUS != ''
+        run: |
+          echo "Rolling back to $PREVIOUS"
+          ROLLBACK_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${PREVIOUS}"
+
+          gcloud run deploy ${SERVICE_NAME} \
+            --image ${ROLLBACK_IMAGE} \
+            --region ${REGION} \
+            --service-account ${SERVICE_NAME}-runtime@${PROJECT_ID}.iam.gserviceaccount.com \
+            --platform managed \
+            --quiet
