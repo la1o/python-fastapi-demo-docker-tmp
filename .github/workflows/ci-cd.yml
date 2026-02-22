@@ -131,7 +131,9 @@ jobs:
             --deploy-health-check \
             --timeout=1m1s \
             --update-env-vars=GITHUB_SHA=${{ github.sha }} \
-            --quiet
+            --quiet \
+            --format='value(status.url)' > service_url.tmp
+          echo "SERVICE_URL=$(cat service_url.tmp)" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
           echo "::group::set version ${{ github.sha }}"
@@ -152,10 +154,16 @@ jobs:
 
           echo "::debug::URL ${URL}"
 
-          GITHUB_SHA_RESPONSE=$(curl -s $URL/health | jq -r '.sha')
+          GITHUB_SHA_RESPONSE=$(curl -s $URL/health | jq -r '.github_sha')
           echo "::notice::GITHUB_SHA_RESPONSE ${GITHUB_SHA_RESPONSE}"
           if [[ "$GITHUB_SHA_RESPONSE" != "${{ github.sha }}" ]]; then
+            echo "### 🔥 Despliegue no exitoso, SHA no corresponde a lo desplegado" >> $GITHUB_STEP_SUMMARY
             echo "::error::${URL} not working"
             exit 1
           fi
+
+          echo "### 🚀 Despliegue Exitoso" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ambiente:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Servicio:** ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.deploy.outputs.SERVICE_URL }}" >> $GITHUB_STEP_SUMMARY
 
