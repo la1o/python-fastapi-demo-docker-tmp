@@ -26,6 +26,8 @@ ENV PATH=/home/app/.local/bin:$PATH
 # Install system dependencies and Python dependencies
 COPY --chown=app:app --from=builder /server/wheels /server/wheels
 COPY --chown=app:app --from=builder /server/requirements.txt .
+
+# hadolint ignore=DL3003
 RUN pip install --no-cache-dir /server/wheels/* \
     && pip install --no-cache-dir uvicorn
 

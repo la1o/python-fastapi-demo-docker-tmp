@@ -60,6 +60,13 @@ jobs:
         run: |
           IMAGE="${IMAGE_NAME}:${{ github.sha }}"
           docker build -t $IMAGE .
+          docker save -o /tmp/testimage.tar ${IMAGE}
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: testimage
+          path: /tmp/testimage.tar
 
   deploy-main:
     if: github.ref == 'refs/heads/main'
@@ -73,30 +80,6 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_SA_EMAIL }}
 
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Get current deployed version
-        run: |
-          PREVIOUS=$(gcloud secrets versions access latest \
-            --secret=${SECRET_NAME} \
-            --project=${PROJECT_ID} 2>/dev/null || echo "")
-          echo "PREVIOUS=$PREVIOUS" >> $GITHUB_ENV
-
-      - name: Update Secret
-        run: |
-          echo "${{ github.sha }}" | \
-          gcloud secrets versions add ${SECRET_NAME} \
-            --data-file=- \
-            --project=${PROJECT_ID}
-
-      - name: Deploy
-        run: |
-          gcloud run deploy ${SERVICE_NAME} \
-            --image ${{ needs.build.outputs.image }} \
-            --region ${REGION} \
-            --service-account ${SERVICE_NAME}-runtime@${PROJECT_ID}.iam.gserviceaccount.com \
-            --platform managed \
-            --quiet
 
   deploy-feature:
     if: startsWith(github.ref, 'refs/heads/feature/')
@@ -112,11 +95,21 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Download image from artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: testimage.tar
+          path: /tmp
+
       - name: Deploy feature branch
         run: |
-          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${{ github.sha }}"
-          docker build -t $IMAGE .
+          docker load < /tmp/testimage.tar
 
+          IMAGE_TMP="${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${{ github.sha }}"
+          #docker build -t $IMAGE .
+
+          docker tag ${IMAGE_TMP} ${IMAGE}
           docker push $IMAGE
 
           gcloud run deploy ${SERVICE_NAME} \
