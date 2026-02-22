@@ -79,6 +79,7 @@ jobs:
 
   terraform-checks:
     if: github.event_name == 'pull_request'
+    needs: build
     name: "Check terraform ${{ matrix.env }}"
     runs-on: ubuntu-latest
     strategy:
