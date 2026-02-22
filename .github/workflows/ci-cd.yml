@@ -114,7 +114,7 @@ jobs:
           IMAGE_TMP="${IMAGE_NAME}:${{ github.sha }}"
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}-${ENV}/${IMAGE_NAME}-${ENV}:${{ github.sha }}"
 
-          echo "::debug::image tag
+          echo "::debug::image tag"
           docker tag ${IMAGE_TMP} ${IMAGE}
 
           echo "::debug::image push $IMAGE"
