@@ -90,7 +90,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: infra/env/${{ matrix.env }}
+        working-directory: infra/envs/${{ matrix.env }}
 
     steps:
       - name: Checkout
