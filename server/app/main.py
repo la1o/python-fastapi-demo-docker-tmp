@@ -110,5 +110,5 @@ def delete_book(request: Request, book_id: int, db: Session = Depends(get_db)):
 def health():
     return {
         "status": "ok",
-        "version": os.getenv("APP_VERSION", "unknown")
+        "github_sha": os.getenv("GITHUB_SHA", "none")
     }

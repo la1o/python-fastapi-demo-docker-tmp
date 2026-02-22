@@ -130,6 +130,7 @@ jobs:
             --platform managed \
             --deploy-health-check \
             --timeout=1m1s \
+            --update-env-vars=GITHUB_SHA=${{ github.sha }} \
             --quiet
           echo "::endgroup::"
 
@@ -151,8 +152,9 @@ jobs:
 
           echo "::debug::URL ${URL}"
 
-          STATUS=$(curl -s $URL/health | jq -r '.status')
-          if [[ "$STATUS" != "ok" ]]; then
+          GITHUB_SHA_RESPONSE=$(curl -s $URL/health | jq -r '.sha')
+          echo "::notice::GITHUB_SHA_RESPONSE ${GITHUB_SHA_RESPONSE}"
+          if [[ "$GITHUB_SHA_RESPONSE" != "${{ github.sha }}" ]]; then
             echo "::error::${URL} not working"
             exit 1
           fi

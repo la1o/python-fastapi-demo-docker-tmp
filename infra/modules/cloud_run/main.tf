@@ -53,6 +53,12 @@ resource "google_cloud_run_v2_service" "service" {
       }
 
       env {
+        name  = "GITHUB_SHA"
+        value = ""
+      }
+
+
+      env {
         name = "APP_VERSION"
 
         value_source {
