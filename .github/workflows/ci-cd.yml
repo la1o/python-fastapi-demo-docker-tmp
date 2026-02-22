@@ -114,13 +114,15 @@ jobs:
           IMAGE_TMP="${IMAGE_NAME}:${{ github.sha }}"
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}-${ENV}/${IMAGE_NAME}-${ENV}:${{ github.sha }}"
 
-          echo "::debug::image tag"
+          echo "::group::image tag"
           docker tag ${IMAGE_TMP} ${IMAGE}
+          echo "::endgroup::"
 
-          echo "::debug::image push $IMAGE"
+          echo "::group::image push $IMAGE"
           docker push $IMAGE
+          echo "::endgroup::"
 
-          echo "::debug::deploy"
+          echo "::group::run deploy"
           gcloud run deploy ${SERVICE_NAME}-${ENV} \
             --image $IMAGE \
             --region ${REGION} \
@@ -129,21 +131,29 @@ jobs:
             --deploy-health-check \
             --timeout=1m1s \
             --quiet
+          echo "::endgroup::"
 
-          echo "::debug::set version ${{ github.sha }}"
+          echo "::group::set version ${{ github.sha }}"
           echo "${{ github.sha }}" | \
           gcloud secrets versions add ${SERVICE_NAME}-version-${ENV} \
             --data-file=- \
             --project=${PROJECT_ID}
+          echo "::endgroup::"
 
-      - name: Smoke tests
+      - name: Smoke test
         run: |
+          echo "::group::get info deploy"
           URL=$(gcloud run services describe ${SERVICE_NAME}-${ENV} --platform managed \
             --region ${REGION} \
             --format json | jq \
             -r '.metadata.annotations."run.googleapis.com/urls"' | jq -r '.[0]')
+          echo "::endgroup::"
 
           echo "::debug::URL ${URL}"
 
-          curl -s $URL/health >> "$GITHUB_OUTPUT"
+          STATUS=$(curl -s $URL/health | jq -r '.status')
+          if [[ "$STATUS" != "ok" ]]; then
+            echo "::error::${URL} not working"
+            exit 1
+          fi
 
