@@ -60,13 +60,13 @@ jobs:
         run: |
           IMAGE="${IMAGE_NAME}:${{ github.sha }}"
           docker build -t $IMAGE .
-          docker save -o /tmp/testimage.tar ${IMAGE}
+          docker save -o /tmp/imagetmp.tar ${IMAGE}
 
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload image
+        uses: actions/upload-artifact@v7
         with:
-          name: testimage
-          path: /tmp/testimage.tar
+          name: imagetmp
+          path: /tmp/imagetmp.tar
 
   deploy-main:
     if: github.ref == 'refs/heads/main'
@@ -96,9 +96,9 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Download image from artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v7
         with:
-          name: testimage.tar
+          name: imagetmp
           path: /tmp
 
       - name: Deploy feature branch
