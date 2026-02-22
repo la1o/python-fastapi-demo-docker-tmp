@@ -77,6 +77,42 @@ jobs:
           name: imagetmp
           path: /tmp/imagetmp.tar
 
+  terraform:
+    name: "Validation & Linting"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+  terraform-checks:
+    name: "Check ${{ matrix.env }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+
+    defaults:
+      run:
+        working-directory: infra/env/${{ matrix.env }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
   deploy-main:
     if: github.ref == 'refs/heads/main'
     needs: build
