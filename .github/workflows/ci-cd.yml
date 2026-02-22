@@ -77,16 +77,9 @@ jobs:
           name: imagetmp
           path: /tmp/imagetmp.tar
 
-  terraform:
-    name: "Validation & Linting"
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      pull-requests: write
-
   terraform-checks:
-    name: "Check ${{ matrix.env }}"
+    if: github.event_name == 'pull_request'
+    name: "Check terraform ${{ matrix.env }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
