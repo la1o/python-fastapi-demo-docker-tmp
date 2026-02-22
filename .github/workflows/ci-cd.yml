@@ -100,6 +100,22 @@ jobs:
       ENV: "dev"
 
     steps:
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Run TFLint
+        run: |
+          tflint --init
+          tflint -f compact
+
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
@@ -174,5 +190,5 @@ jobs:
           echo "### 🚀 Despliegue Exitoso" >> $GITHUB_STEP_SUMMARY
           echo "- **Ambiente:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Servicio:** ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** ${{ steps.deploy.outputs.SERVICE_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${SERVICE_URL}" >> $GITHUB_STEP_SUMMARY
 
