@@ -133,9 +133,6 @@ jobs:
             --data-file=- \
             --project=${PROJECT_ID}
 
-      - name: Install jq
-        uses: dcarbone/install-jq-action@latest
-
       - name: Smoke tests
         run: |
           URL=$(gcloud run services describe ${SERVICE_NAME} --platform managed \
