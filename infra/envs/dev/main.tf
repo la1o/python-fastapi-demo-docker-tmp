@@ -27,10 +27,11 @@ module "artifact_registry" {
 }
 
 module "secret_manager" {
-  source           = "../../modules/secret_manager"
-  project_id       = var.project_id
-  secret_name      = "${var.app_name}-${var.environment}-version"
-  runtime_sa_email = module.service_accounts.runtime_sa_email
+  source             = "../../modules/secret_manager"
+  project_id         = var.project_id
+  secret_name        = "${var.app_name}-version-${var.environment}"
+  runtime_sa_email   = module.service_accounts.runtime_sa_email
+  deployer_sa_email  = module.service_accounts.deployer_sa_email
 }
 
 module "cloud_run" {
@@ -40,7 +41,7 @@ module "cloud_run" {
   service_name        = "${var.app_name}-${var.environment}"
   image               = var.image
   runtime_sa_email    = module.service_accounts.runtime_sa_email
-  secret_name         = "${var.app_name}-${var.environment}-version"
+  secret_name         = "${var.app_name}-version-${var.environment}"
   docker_database_url = var.docker_database_url
 }
 
