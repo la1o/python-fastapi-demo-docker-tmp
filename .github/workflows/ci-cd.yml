@@ -95,6 +95,9 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
       - name: Download image from artifact
         uses: actions/download-artifact@v5
         with:
