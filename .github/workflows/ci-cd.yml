@@ -23,7 +23,6 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    environment: dev
 
     outputs:
       image: ${{ steps.meta.outputs.image }}
@@ -46,6 +45,10 @@ jobs:
           export DOCKER_DATABASE_URL=sqlite:///:memory:
           export PYTHONPATH=.
           pytest -v --disable-warnings
+
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
 
       - uses: google-github-actions/auth@v2
         with:
