@@ -42,7 +42,11 @@ jobs:
           pip install flake8 pytest httpx
 
       - name: Lint
-        run: flake8 server --max-line-length=100
+        run: |
+          flake8 server --max-line-length=100
+          if [[ "$?" != "0" ]]; then
+            echo "### flake8 con errores" >> $GITHUB_STEP_SUMMARY
+          fi
         continue-on-error: true
 
       - name: Run tests
@@ -60,6 +64,11 @@ jobs:
         run: |
           IMAGE="${IMAGE_NAME}:${{ github.sha }}"
           docker build -t $IMAGE .
+          if [[ "$?" != "0" ]]; then
+            echo "### Build container con errores" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
           docker save -o /tmp/imagetmp.tar ${IMAGE}
 
       - name: Upload image
@@ -133,7 +142,7 @@ jobs:
             --update-env-vars=GITHUB_SHA=${{ github.sha }} \
             --quiet \
             --format='value(status.url)' > service_url.tmp
-          echo "SERVICE_URL=$(cat service_url.tmp)" >> $GITHUB_OUTPUT
+          echo "SERVICE_URL=$(cat service_url.tmp)" >> "$GITHUB_ENV"
           echo "::endgroup::"
 
           echo "::group::set version ${{ github.sha }}"
@@ -145,16 +154,16 @@ jobs:
 
       - name: Smoke test
         run: |
-          echo "::group::get info deploy"
-          URL=$(gcloud run services describe ${SERVICE_NAME}-${ENV} --platform managed \
-            --region ${REGION} \
-            --format json | jq \
-            -r '.metadata.annotations."run.googleapis.com/urls"' | jq -r '.[0]')
-          echo "::endgroup::"
+          # echo "::group::get info deploy"
+          # URL=$(gcloud run services describe ${SERVICE_NAME}-${ENV} --platform managed \
+          #   --region ${REGION} \
+          #   --format json | jq \
+          #   -r '.metadata.annotations."run.googleapis.com/urls"' | jq -r '.[0]')
+          # echo "::endgroup::"
 
-          echo "::debug::URL ${URL}"
+          echo "::debug::SERVICE_URL ${SERVICE_URL}"
 
-          GITHUB_SHA_RESPONSE=$(curl -s $URL/health | jq -r '.github_sha')
+          GITHUB_SHA_RESPONSE=$(curl -s $SERVICE_URL/health | jq -r '.github_sha')
           echo "::notice::GITHUB_SHA_RESPONSE ${GITHUB_SHA_RESPONSE}"
           if [[ "$GITHUB_SHA_RESPONSE" != "${{ github.sha }}" ]]; then
             echo "### 🔥 Despliegue no exitoso, SHA no corresponde a lo desplegado" >> $GITHUB_STEP_SUMMARY
