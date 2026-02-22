@@ -127,9 +127,14 @@ jobs:
 
       - name: Deploy feature branch
         run: |
+          echo "IMAGE=${{ needs.build.outputs.image }}"
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${{ github.sha }}"
+          echo "Deploying $IMAGE"
+
           gcloud run deploy ${SERVICE_NAME} \
-            --image ${{ needs.build.outputs.image }} \
+            --image $IMAGE \
             --region ${REGION} \
             --service-account ${SERVICE_NAME}-runtime@${PROJECT_ID}.iam.gserviceaccount.com \
             --platform managed \
             --quiet
+
