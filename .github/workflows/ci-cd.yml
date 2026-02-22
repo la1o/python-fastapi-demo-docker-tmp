@@ -78,6 +78,7 @@ jobs:
           name: imagetmp
           path: /tmp/imagetmp.tar
 
+
   terraform-checks:
     if: github.event_name == 'pull_request'
     needs: build
