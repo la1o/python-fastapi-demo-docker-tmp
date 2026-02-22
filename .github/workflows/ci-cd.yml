@@ -63,7 +63,7 @@ jobs:
           docker save -o /tmp/imagetmp.tar ${IMAGE}
 
       - name: Upload image
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: imagetmp
           path: /tmp/imagetmp.tar
@@ -96,7 +96,7 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Download image from artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v5
         with:
           name: imagetmp
           path: /tmp
