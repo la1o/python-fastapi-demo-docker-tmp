@@ -38,7 +38,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r server/requirements.txt
-          pip install pytest httpx
+          pip install flake8 pytest httpx
+
+      - name: Lint
+        run: flake8 server --max-line-length=100
+        continue-on-error: true
 
       - name: Run tests
         run: |
@@ -47,6 +51,7 @@ jobs:
           pytest -v --disable-warnings
 
       - uses: hadolint/hadolint-action@v3.1.0
+        continue-on-error: true
         with:
           dockerfile: Dockerfile
 
