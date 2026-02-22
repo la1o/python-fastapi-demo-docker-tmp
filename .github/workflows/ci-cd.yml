@@ -56,10 +56,9 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-      - name: Build & Push
-        id: meta
+      - name: Build container
         run: |
-          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE="${IMAGE_NAME}:${{ github.sha }}"
           docker build -t $IMAGE .
 
   deploy-main:
@@ -115,9 +114,11 @@ jobs:
 
       - name: Deploy feature branch
         run: |
+          IMAGE_TEMP="${IMAGE_NAME}:${{ github.sha }}"
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${{ github.sha }}"          
           echo "Deploying $IMAGE"
 
+          docker tag ${IMAGE_TEMP} ${IMAGE}
           docker push $IMAGE
 
           gcloud run deploy ${SERVICE_NAME} \
