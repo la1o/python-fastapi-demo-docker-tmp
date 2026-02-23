@@ -1,9 +1,9 @@
 # Info
 
-Repositorio: https://github.com/la1o/python-fastapi-demo-docker-tmp
-URL Despliegue: https://app-api-dev-589250491076.europe-north2.run.app
-Tag: https://github.com/la1o/python-fastapi-demo-docker-tmp/releases/tag/v0.0.7
-Pipeline despliegue: https://github.com/la1o/python-fastapi-demo-docker-tmp/actions/runs/22290412444
+- Repositorio: https://github.com/la1o/python-fastapi-demo-docker-tmp
+- URL Despliegue: https://app-api-dev-589250491076.europe-north2.run.app
+- Tag: https://github.com/la1o/python-fastapi-demo-docker-tmp/releases/tag/v0.0.7
+- Pipeline despliegue: https://github.com/la1o/python-fastapi-demo-docker-tmp/actions/runs/22290412444
 
 # Decisiones principales
 - App se modifico para usar sqlite en memoria dentro del despliegue
