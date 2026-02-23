@@ -1,8 +1,3 @@
-Incluye AI_USAGE.md con:
-●​ Qué IA(s) usaste
-●​ Qué prompts/instrucciones usaste (copiar/pegar o resumen fiel)
-●​ En qué partes influyó (YAML, Terraform, scripts, docs, etc.)​
-
 IA: Chatgpt
 
 Prompts/Resumen:
