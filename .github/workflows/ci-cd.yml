@@ -114,19 +114,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
 
-    steps:
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_SA_EMAIL }}
-
-
-  deploy-feature:
-    if: startsWith(github.ref, 'refs/heads/feature/')
-    needs: build
-    runs-on: ubuntu-latest
-    environment: dev
-
     env:
       ENV: "dev"
 
