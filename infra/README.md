@@ -1,3 +1,5 @@
+# Crear infraestructura
+
 Para desplegar, se crea el proyecto
 
 ```bash
@@ -29,3 +31,12 @@ terraform apply \
   -var="image=us-docker.pkg.dev/cloudrun/container/hello" \
   -var="docker_database_url=sqlite:///:memory:"
 ```
+
+# Justificación
+
+La infraestructura se ha organizado siguiendo el principio 
+DRY (Don't Repeat Yourself), separando la lógica de los recursos de su 
+implementación por entorno.
+
+Se evita tener modulos/versiones desactualizadas entre los distintos ambientes.
+
