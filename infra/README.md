@@ -25,7 +25,7 @@ terraform apply \
   -var="environment=dev" \
   -var="region=europe-north2" \
   -var="app_name=app-api" \
-  -var="github_repository=la1o/python-fastapi-demo-docker-tmp" \
+  -var="github_repository=la1o/python-fastapi-demo-docker" \
   -var="image=us-docker.pkg.dev/cloudrun/container/hello" \
   -var="docker_database_url=sqlite:///:memory:"
 ```
