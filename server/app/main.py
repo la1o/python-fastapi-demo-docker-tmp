@@ -8,9 +8,9 @@ from server.app.connect import db_session, engine
 
 app = FastAPI()
 
-if os.getenv("RUN_MIGRATIONS", "true") == "true":
+@app.on_event("startup")
+def startup():
     Base.metadata.create_all(bind=engine)
-
 
 def get_db():
     db = db_session()
@@ -108,5 +108,7 @@ def delete_book(request: Request, book_id: int, db: Session = Depends(get_db)):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
-
+    return {
+        "status": "ok",
+        "github_sha": os.getenv("GITHUB_SHA", "none")
+    }

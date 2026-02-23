@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.14-slim-bookworm as builder
+FROM python:3.14.3-slim-bookworm as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -12,7 +12,7 @@ WORKDIR /server
 COPY ./server/requirements.txt /server/
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /server/wheels -r requirements.txt
 
-FROM python:3.14-slim-bookworm as runner
+FROM python:3.14.3-slim-bookworm as runner
 
 WORKDIR /server
 
@@ -26,6 +26,8 @@ ENV PATH=/home/app/.local/bin:$PATH
 # Install system dependencies and Python dependencies
 COPY --chown=app:app --from=builder /server/wheels /server/wheels
 COPY --chown=app:app --from=builder /server/requirements.txt .
+
+# hadolint ignore=DL3003
 RUN pip install --no-cache-dir /server/wheels/* \
     && pip install --no-cache-dir uvicorn
 

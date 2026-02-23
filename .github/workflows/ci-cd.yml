@@ -1,0 +1,212 @@
+name: CI-CD
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main, "feature/**" ]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PYTHON_VERSION: "3.14.3"
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-north2
+  REPOSITORY: app-api
+  SERVICE_NAME: app-api
+  IMAGE_NAME: app
+  SECRET_NAME: version
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server/requirements.txt
+          pip install flake8 pytest httpx
+
+      - name: Lint
+        run: |
+          flake8 server --max-line-length=100
+          if [[ "$?" != "0" ]]; then
+            echo "### flake8 con errores" >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true
+
+      - name: Run tests
+        run: |
+          export DOCKER_DATABASE_URL=sqlite:///:memory:
+          export PYTHONPATH=.
+          pytest -v --disable-warnings
+
+      - uses: hadolint/hadolint-action@v3.1.0
+        continue-on-error: true
+        with:
+          dockerfile: Dockerfile
+
+      - name: Build container
+        run: |
+          IMAGE="${IMAGE_NAME}:${{ github.sha }}"
+          docker build -t $IMAGE .
+          if [[ "$?" != "0" ]]; then
+            echo "### Build container con errores" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          docker save -o /tmp/imagetmp.tar ${IMAGE}
+
+      - name: Upload image
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v5
+        with:
+          name: imagetmp
+          path: /tmp/imagetmp.tar
+
+  terraform-checks:
+    if: github.event_name == 'pull_request'
+    needs: build
+    name: "Check terraform ${{ matrix.env }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+
+    defaults:
+      run:
+        working-directory: infra/envs/${{ matrix.env }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive || true
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+  deploy-main:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: dev
+
+    env:
+      ENV: "dev"
+
+    steps:
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Run TFLint
+        run: |
+          tflint --init
+          tflint -f compact
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+      - name: Download image from artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: imagetmp
+          path: /tmp
+
+      - name: Deploy feature branch
+        run: |
+          docker load < /tmp/imagetmp.tar
+
+          IMAGE_TMP="${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}-${ENV}/${IMAGE_NAME}-${ENV}:${{ github.sha }}"
+
+          echo "::group::image tag"
+          docker tag ${IMAGE_TMP} ${IMAGE}
+          echo "::endgroup::"
+
+          echo "::group::image push $IMAGE"
+          docker push $IMAGE
+          echo "::endgroup::"
+
+          echo "::group::run deploy"
+          gcloud run deploy ${SERVICE_NAME}-${ENV} \
+            --image $IMAGE \
+            --region ${REGION} \
+            --service-account ${SERVICE_NAME}-${ENV}-runtime@${PROJECT_ID}.iam.gserviceaccount.com \
+            --platform managed \
+            --deploy-health-check \
+            --timeout=1m1s \
+            --update-env-vars=GITHUB_SHA=${{ github.sha }} \
+            --quiet \
+            --format='value(status.url)' > service_url.tmp
+          echo "SERVICE_URL=$(cat service_url.tmp)" >> "$GITHUB_ENV"
+          echo "::endgroup::"
+
+          echo "::group::set version ${{ github.sha }}"
+          echo "${{ github.sha }}" | \
+          gcloud secrets versions add ${SERVICE_NAME}-version-${ENV} \
+            --data-file=- \
+            --project=${PROJECT_ID}
+          echo "::endgroup::"
+
+      - name: Smoke test
+        run: |
+          # echo "::group::get info deploy"
+          # URL=$(gcloud run services describe ${SERVICE_NAME}-${ENV} --platform managed \
+          #   --region ${REGION} \
+          #   --format json | jq \
+          #   -r '.metadata.annotations."run.googleapis.com/urls"' | jq -r '.[0]')
+          # echo "::endgroup::"
+
+          echo "::debug::SERVICE_URL ${SERVICE_URL}"
+
+          GITHUB_SHA_RESPONSE=$(curl -s $SERVICE_URL/health | jq -r '.github_sha')
+          echo "::notice::GITHUB_SHA_RESPONSE ${GITHUB_SHA_RESPONSE}"
+          if [[ "$GITHUB_SHA_RESPONSE" != "${{ github.sha }}" ]]; then
+            echo "### 🔥 Despliegue no exitoso, SHA no corresponde a lo desplegado" >> $GITHUB_STEP_SUMMARY
+            echo "::error::${URL} not working"
+            exit 1
+          fi
+
+          echo "### 🚀 Despliegue Exitoso" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ambiente:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Servicio:** ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${SERVICE_URL}" >> $GITHUB_STEP_SUMMARY
+
