@@ -1,0 +1,134 @@
+name: Prod CI-CD 
+
+on:
+  push:
+    tags:
+      - 'v*' 
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PYTHON_VERSION: "3.14.3"
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-north2
+  REPOSITORY: app-api
+  SERVICE_NAME: app-api
+  IMAGE_NAME: app
+  SECRET_NAME: version
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server/requirements.txt
+
+      - name: Build container
+        run: |
+          IMAGE="${IMAGE_NAME}:${{ github.sha }}"
+          docker build -t $IMAGE .
+          if [[ "$?" != "0" ]]; then
+            echo "### Build container con errores" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          docker save -o /tmp/imagetmp.tar ${IMAGE}
+
+      - name: Upload image
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v5
+        with:
+          name: imagetmp
+          path: /tmp/imagetmp.tar
+
+  deploy-main:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: dev #deberia ser prod
+
+    env:
+      ENV: dev #deberia ser prod
+
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+      - name: Download image from artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: imagetmp
+          path: /tmp
+
+      - name: Deploy feature branch
+        run: |
+          docker load < /tmp/imagetmp.tar
+
+          IMAGE_TMP="${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}-${ENV}/${IMAGE_NAME}-${ENV}:${{ github.sha }}"
+
+          echo "::group::image tag"
+          docker tag ${IMAGE_TMP} ${IMAGE}
+          echo "::endgroup::"
+
+          echo "::group::image push $IMAGE"
+          docker push $IMAGE
+          echo "::endgroup::"
+
+          echo "::group::run deploy"
+          gcloud run deploy ${SERVICE_NAME}-${ENV} \
+            --image $IMAGE \
+            --region ${REGION} \
+            --service-account ${SERVICE_NAME}-${ENV}-runtime@${PROJECT_ID}.iam.gserviceaccount.com \
+            --platform managed \
+            --deploy-health-check \
+            --timeout=1m1s \
+            --update-env-vars=GITHUB_SHA=${{ github.sha }} \
+            --quiet \
+            --format='value(status.url)' > service_url.tmp
+          echo "SERVICE_URL=$(cat service_url.tmp)" >> "$GITHUB_ENV"
+          echo "::endgroup::"
+
+          echo "::group::set version ${{ github.sha }}"
+          echo "${{ github.sha }}" | \
+          gcloud secrets versions add ${SERVICE_NAME}-version-${ENV} \
+            --data-file=- \
+            --project=${PROJECT_ID}
+          echo "::endgroup::"
+
+      - name: Smoke test
+        run: |
+          echo "::debug::SERVICE_URL ${SERVICE_URL}"
+
+          GITHUB_SHA_RESPONSE=$(curl -s $SERVICE_URL/health | jq -r '.github_sha')
+          echo "::notice::GITHUB_SHA_RESPONSE ${GITHUB_SHA_RESPONSE}"
+          if [[ "$GITHUB_SHA_RESPONSE" != "${{ github.sha }}" ]]; then
+            echo "### 🔥 Despliegue no exitoso, SHA no corresponde a lo desplegado" >> $GITHUB_STEP_SUMMARY
+            echo "::error::${URL} not working"
+            exit 1
+          fi
+
+          echo "### 🚀 Despliegue Exitoso" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ambiente:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Servicio:** ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${SERVICE_URL}" >> $GITHUB_STEP_SUMMARY
+
